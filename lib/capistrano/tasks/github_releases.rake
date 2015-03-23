@@ -126,7 +126,7 @@ namespace :github do
       message = "#{fetch(:release_title)} by #{fetch(:username)}\n"
 
       run_locally do
-        execute :git, :tag, '-am', "#{message}", "#{fetch(:release_tag)}"
+        execute :git, :tag, '-am', "'#{message}'", "'#{fetch(:release_tag)}'"
         execute :git, :push, :origin, "#{fetch(:release_tag)}"
       end
     end
