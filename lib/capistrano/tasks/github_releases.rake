@@ -18,26 +18,15 @@ namespace :github do
   namespace :releases do
     set :ask_release, false
     set :released_at, -> { Time.now }
-    set :release_tag, -> { fetch(:released_at).strftime('%Y%m%d-%H%M%S%z') }
+    set :release_tag, -> { "#{fetch(:branch)}_#{fetch(:released_at).strftime('%Y%m%d-%H%M%S%z')}" }
 
     set :username, -> {
       username = `git config --get user.name`.strip
-      username = `whoami`.strip unless username
-      username
+      username ||= `whoami`.strip
     }
 
     set :release_title, -> {
-      default_title = nil
-
-      run_locally do
-        begin
-          pull_request = Octokit.pull(fetch(:github_repo), fetch(:pull_request_id))
-          default_title = pull_request.title
-        rescue => e
-          error e.message
-          default_title = fetch(:release_tag)
-        end
-      end
+      default_title = fetch(:release_tag)
 
       if fetch(:ask_release)
         title = HighLine.new.ask("Release Title? [default: #{default_title}]")
@@ -50,8 +39,9 @@ namespace :github do
 
     set :release_body, -> {
       default_body = <<-MD.gsub(/^ {6}/, '').strip
+        branch: #{fetch(:branch)}
+        server: #{fetch(:stage)}
         released at #{fetch(:released_at).strftime('%Y-%m-%d %H:%M:%S %z')}
-        pull request: #{fetch(:github_repo)}##{fetch(:pull_request_id)}
       MD
 
       if fetch(:ask_release)
@@ -60,17 +50,6 @@ namespace :github do
       else
         default_body
       end
-    }
-
-    set :pull_request_id, -> {
-      id = nil
-
-      run_locally do
-        merge_comment = capture "git log | grep 'Merge pull request' | head -n 1"
-        id = merge_comment.match(/#(\d+)/)[1].to_i
-      end
-
-      id
     }
 
     set :release_comment, -> {
@@ -128,7 +107,7 @@ namespace :github do
             fetch(:release_tag),
             name: fetch(:release_title),
             body: fetch(:release_body),
-            target_commitish: 'master',
+            target_commitish: fetch(:branch),
             draft: false,
             prerelease: false
           )
@@ -139,29 +118,12 @@ namespace :github do
         end
       end
     end
-
-    desc 'Add comment for new release'
-    task add_comment: :authentication do
-      run_locally do
-        begin
-          Octokit.add_comment(
-            fetch(:github_repo),
-            fetch(:pull_request_id),
-            fetch(:release_comment)
-          )
-          info "Comment to #{fetch(:github_repo)}/pull##{fetch(:pull_request_id)} was added"
-        rescue => e
-          error e.message
-        end
-      end
-    end
   end
 
   namespace :git do
     desc 'Create tag for new release and push to origin'
     task :create_tag_and_push_origin do
       message = "#{fetch(:release_title)} by #{fetch(:username)}\n"
-      message += "#{fetch(:github_repo)}##{fetch(:pull_request_id)}"
 
       run_locally do
         execute :git, :tag, '-am', "#{message}", "#{fetch(:release_tag)}"
