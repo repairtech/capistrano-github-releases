@@ -117,6 +117,7 @@ namespace :github do
           info "Release as #{fetch(:release_tag)} to #{fetch(:github_repo)} was created"
         rescue => e
           error e.message
+          error e.backtrace
           invoke 'github:git:create_tag_and_push_origin'
         end
       end
