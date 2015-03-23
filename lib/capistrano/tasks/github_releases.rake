@@ -102,6 +102,9 @@ namespace :github do
     task create: :authentication do
       run_locally do
         begin
+          debug fetch(:release_title)
+          debug fetch(:release_body)
+          debug fetch(:branch)
           Octokit.create_release(
             fetch(:github_repo),
             fetch(:release_tag),
